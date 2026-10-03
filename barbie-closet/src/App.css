@@ -1,0 +1,308 @@
+* {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  margin: 0;
+  width: 100%;
+  min-height: 100%;
+}
+
+body {
+  font-family: Arial, Helvetica, sans-serif;
+
+  background:
+    linear-gradient(
+      135deg,
+      #ffb6dc,
+      #ff4fa3
+    );
+}
+
+.app {
+  min-height: 100vh;
+  width: 100%;
+
+  text-align: center;
+
+  padding: 30px;
+
+  color: white;
+}
+
+/* HEADER */
+
+header h1 {
+  font-size: 48px;
+
+  margin: 10px 0 5px;
+
+  color: white;
+
+  text-shadow:
+    3px 3px 0 #d6006e;
+}
+
+header p {
+  font-size: 18px;
+
+  margin-bottom: 20px;
+}
+
+/* STATUS */
+
+.status {
+  display: inline-block;
+
+  margin-bottom: 10px;
+
+  padding: 8px 16px;
+
+  background:
+    rgba(
+      255,
+      255,
+      255,
+      0.9
+    );
+
+  color: #d6006e;
+
+  border-radius: 20px;
+
+  font-weight: bold;
+}
+
+/* GESTURE */
+
+.gesture-display {
+  width:
+    min(
+      700px,
+      90vw
+    );
+
+  margin:
+    5px auto;
+
+  padding: 10px 16px;
+
+  background: white;
+
+  color: #d6006e;
+
+  border-radius: 20px;
+
+  font-size: 18px;
+
+  font-weight: bold;
+}
+
+/* CURRENT TOP */
+
+.top-display {
+  width:
+    min(
+      700px,
+      90vw
+    );
+
+  margin:
+    8px auto 15px;
+
+  padding: 10px 16px;
+
+  background: #ff1493;
+
+  color: white;
+
+  border-radius: 20px;
+
+  font-weight: bold;
+}
+
+/* CAMERA FRAME */
+
+.camera-frame {
+  position: relative;
+
+  width:
+    min(
+      700px,
+      90vw
+    );
+
+  margin: 0 auto;
+
+  padding: 10px;
+
+  background: white;
+
+  border:
+    5px solid #ff1493;
+
+  border-radius: 30px;
+
+  box-shadow:
+    0 10px 40px
+      rgba(
+        150,
+        0,
+        80,
+        0.35
+      );
+
+  overflow: hidden;
+}
+
+.camera-container {
+  position: relative;
+
+  width: 100%;
+}
+
+/* CAMERA */
+
+.camera {
+  display: block;
+
+  width: 100%;
+
+  min-height: 400px;
+
+  object-fit: cover;
+
+  border-radius: 18px;
+
+  /*
+    Mirror the webcam
+  */
+  transform:
+    scaleX(-1);
+}
+
+/* BODY TRACKING CANVAS */
+
+.pose-canvas {
+  position: absolute;
+
+  inset: 0;
+
+  width: 100%;
+  height: 100%;
+
+  /*
+    Mirror tracking dots
+    with camera
+  */
+  transform:
+    scaleX(-1);
+
+  pointer-events: none;
+}
+
+/* CAMERA LABEL */
+
+.camera-label {
+  position: absolute;
+
+  top: 25px;
+
+  left: 50%;
+
+  transform:
+    translateX(-50%);
+
+  background: #ff1493;
+
+  color: white;
+
+  padding: 9px 20px;
+
+  border-radius: 30px;
+
+  font-weight: bold;
+
+  letter-spacing: 1px;
+}
+
+/* CONTROLS */
+
+.controls {
+  width:
+    min(
+      700px,
+      90vw
+    );
+
+  margin:
+    25px auto;
+
+  display: grid;
+
+  grid-template-columns:
+    repeat(
+      2,
+      1fr
+    );
+
+  gap: 12px;
+}
+
+.controls div {
+  background:
+    rgba(
+      255,
+      255,
+      255,
+      0.92
+    );
+
+  color: #d6006e;
+
+  padding: 16px;
+
+  border:
+    2px solid white;
+
+  border-radius: 18px;
+
+  font-weight: bold;
+
+  box-shadow:
+    0 5px 15px
+      rgba(
+        160,
+        0,
+        80,
+        0.15
+      );
+}
+
+/* MOBILE */
+
+@media (
+  max-width: 600px
+) {
+  header h1 {
+    font-size: 34px;
+  }
+
+  .controls {
+    grid-template-columns:
+      1fr;
+  }
+}
+.bottom-display {
+  width: min(700px, 90vw);
+  margin: 8px auto 15px;
+  padding: 10px 16px;
+
+  background: #ff69b4;
+  color: white;
+
+  border-radius: 20px;
+  font-weight: bold;
+}
