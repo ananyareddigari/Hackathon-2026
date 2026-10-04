@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { FilesetResolver, PoseLandmarker } from "@mediapipe/tasks-vision";
+import { removeBackground } from "@imgly/background-removal";
 import "./App.css";
 
 function App() {
@@ -9,59 +10,51 @@ function App() {
   const poseLandmarkerRef = useRef(null);
   const animationRef = useRef(null);
 
-  // HAND HISTORY
+  // Hand movement history
   const leftHandHistoryRef = useRef([]);
   const rightHandHistoryRef = useRef([]);
 
-  // FOOT HISTORY
-  const leftFootHistoryRef = useRef([]);
-  const rightFootHistoryRef = useRef([]);
-
-  // Keeps track of whether a foot was lifted
+  // Foot tracking
   const leftFootLiftedRef = useRef(false);
   const rightFootLiftedRef = useRef(false);
 
-  // Position where the foot normally rests
   const leftFootRestYRef = useRef(null);
   const rightFootRestYRef = useRef(null);
 
+  // Gesture cooldown
   const lastGestureTimeRef = useRef(0);
 
-  const [status, setStatus] = useState(
-    "Loading body tracking..."
-  );
+  // Website state
+  const [status, setStatus] = useState("Loading body tracking...");
+  const [gesture, setGesture] = useState("Waiting for gesture...");
 
-  const [gesture, setGesture] = useState(
-    "Waiting for gesture..."
-  );
+  const [topNumber, setTopNumber] = useState(0);
+  const [bottomNumber, setBottomNumber] = useState(0);
 
-  const [topNumber, setTopNumber] =
-    useState(0);
+  // Clothing upload state
+  const [clothingType, setClothingType] = useState("top");
+  const [uploadedImage, setUploadedImage] = useState(null);
+  const [isRemovingBackground, setIsRemovingBackground] = useState(false);
 
-  const [bottomNumber, setBottomNumber] =
-    useState(0);
+  // =====================================================
+  // CAMERA + MEDIAPIPE
+  // =====================================================
 
   useEffect(() => {
     let stream;
-
-    // ==========================================
-    // START CAMERA
-    // ==========================================
+    let stopped = false;
 
     async function startCamera() {
       try {
-        stream =
-          await navigator.mediaDevices.getUserMedia({
-            video: {
-              width: 1280,
-              height: 720,
-            },
+        stream = await navigator.mediaDevices.getUserMedia({
+          video: {
+            width: 1280,
+            height: 720,
+          },
+          audio: false,
+        });
 
-            audio: false,
-          });
-
-        const video =
-          videoRef.current;
+        const video = videoRef.current;
 
         if (!video) return;
 
@@ -73,66 +66,51 @@ function App() {
 
         await video.play();
 
-        // ======================================
-        // LOAD MEDIAPIPE
-        // ======================================
-
-        const vision =
-          await FilesetResolver.forVisionTasks(
-            "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@latest/wasm"
-          );
-
-        const poseLandmarker =
-          await PoseLandmarker.createFromOptions(
-            vision,
-            {
-              baseOptions: {
-                modelAssetPath:
-                  "https://storage.googleapis.com/mediapipe-models/pose_landmarker/pose_landmarker_full/float16/latest/pose_landmarker_full.task",
-
-                delegate: "GPU",
-              },
-
-              runningMode: "VIDEO",
-
-              numPoses: 1,
-
-              minPoseDetectionConfidence: 0.5,
-              minPosePresenceConfidence: 0.5,
-              minTrackingConfidence: 0.5,
-            }
-          );
-
-        poseLandmarkerRef.current =
-          poseLandmarker;
-
-        setStatus(
-          "Body + foot tracking active ✓"
+        // Load MediaPipe
+        const vision = await FilesetResolver.forVisionTasks(
+          "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@latest/wasm"
         );
+
+        const poseLandmarker = await PoseLandmarker.createFromOptions(
+          vision,
+          {
+            baseOptions: {
+              modelAssetPath:
+                "https://storage.googleapis.com/mediapipe-models/pose_landmarker/pose_landmarker_full/float16/latest/pose_landmarker_full.task",
+              delegate: "GPU",
+            },
+
+            runningMode: "VIDEO",
+            numPoses: 1,
+
+            minPoseDetectionConfidence: 0.5,
+            minPosePresenceConfidence: 0.5,
+            minTrackingConfidence: 0.5,
+          }
+        );
+
+        if (stopped) {
+          poseLandmarker.close();
+          return;
+        }
+
+        poseLandmarkerRef.current = poseLandmarker;
+
+        setStatus("Body + foot tracking active ✓");
 
         detectPose();
       } catch (error) {
         console.error(error);
-
-        setStatus(
-          "Could not start body tracking"
-        );
+        setStatus("Could not start body tracking");
       }
     }
 
-    // ==========================================
+    // =====================================================
     // SAVE HAND POSITION
-    // ==========================================
+    // =====================================================
 
-    function saveHandPosition(
-      historyRef,
-      wrist,
-      time
-    ) {
-      if (
-        !wrist ||
-        wrist.visibility < 0.5
-      ) {
+    function saveHandPosition(historyRef, wrist, time) {
+      if (!wrist || wrist.visibility < 0.5) {
         historyRef.current = [];
         return;
       }
@@ -140,73 +118,47 @@ function App() {
       historyRef.current.push({
         x: wrist.x,
         y: wrist.y,
-        time: time,
+        time,
       });
 
+      // Only keep last 450ms
       while (
         historyRef.current.length > 0 &&
-        time -
-          historyRef.current[0].time >
-          450
+        time - historyRef.current[0].time > 450
       ) {
         historyRef.current.shift();
       }
     }
 
-    // ==========================================
-    // CHECK TOP GESTURES
-    // ==========================================
+    // =====================================================
+    // TOP GESTURES
+    // =====================================================
 
     function checkTopGestures(time) {
-      if (
-        time -
-          lastGestureTimeRef.current <
-        900
-      ) {
+      if (time - lastGestureTimeRef.current < 900) {
         return;
       }
 
-      const leftHistory =
-        leftHandHistoryRef.current;
+      const leftHistory = leftHandHistoryRef.current;
+      const rightHistory = rightHandHistoryRef.current;
 
-      const rightHistory =
-        rightHandHistoryRef.current;
-
-      // ======================================
-      // LEFT HAND →
-      // NEXT TOP
-      // ======================================
-
+      // LEFT HAND → NEXT TOP
       if (leftHistory.length >= 4) {
-        const start =
-          leftHistory[0];
+        const start = leftHistory[0];
+        const end = leftHistory[leftHistory.length - 1];
 
-        const end =
-          leftHistory[
-            leftHistory.length - 1
-          ];
-
-        const xMovement =
-          end.x - start.x;
-
-        const yMovement =
-          end.y - start.y;
+        const xMovement = end.x - start.x;
+        const yMovement = end.y - start.y;
 
         if (
           xMovement > 0.12 &&
-          Math.abs(xMovement) >
-            Math.abs(yMovement) * 1.3
+          Math.abs(xMovement) > Math.abs(yMovement) * 1.3
         ) {
-          setTopNumber(
-            (current) => current + 1
-          );
+          setTopNumber((current) => current + 1);
 
-          setGesture(
-            "LEFT HAND → NEXT TOP 👚"
-          );
+          setGesture("🫲 LEFT HAND → NEXT TOP 👚");
 
-          lastGestureTimeRef.current =
-            time;
+          lastGestureTimeRef.current = time;
 
           leftHandHistoryRef.current = [];
           rightHandHistoryRef.current = [];
@@ -215,49 +167,30 @@ function App() {
         }
       }
 
-      // ======================================
-      // RIGHT HAND ←
-      // PREVIOUS TOP
-      // ======================================
-
+      // RIGHT HAND ← PREVIOUS TOP
       if (rightHistory.length >= 4) {
-        const start =
-          rightHistory[0];
+        const start = rightHistory[0];
+        const end = rightHistory[rightHistory.length - 1];
 
-        const end =
-          rightHistory[
-            rightHistory.length - 1
-          ];
-
-        const xMovement =
-          end.x - start.x;
-
-        const yMovement =
-          end.y - start.y;
+        const xMovement = end.x - start.x;
+        const yMovement = end.y - start.y;
 
         if (
           xMovement < -0.12 &&
-          Math.abs(xMovement) >
-            Math.abs(yMovement) * 1.3
+          Math.abs(xMovement) > Math.abs(yMovement) * 1.3
         ) {
           setTopNumber((current) => {
             if (current === 0) {
-              setGesture(
-                "🚫 FIRST TOP"
-              );
-
+              setGesture("🚫 FIRST TOP");
               return 0;
             }
 
-            setGesture(
-              "RIGHT HAND ← PREVIOUS TOP 👚"
-            );
+            setGesture("RIGHT HAND ← PREVIOUS TOP 👚");
 
             return current - 1;
           });
 
-          lastGestureTimeRef.current =
-            time;
+          lastGestureTimeRef.current = time;
 
           leftHandHistoryRef.current = [];
           rightHandHistoryRef.current = [];
@@ -267,36 +200,19 @@ function App() {
       }
     }
 
-    // ==========================================
-    // UPDATE FOOT RESTING POSITION
-    // ==========================================
+    // =====================================================
+    // FOOT RESTING POSITION
+    // =====================================================
 
-    function updateFootRestPosition(
-      foot,
-      restRef,
-      liftedRef
-    ) {
-      if (
-        !foot ||
-        foot.visibility < 0.5
-      ) {
+    function updateFootRestPosition(foot, restRef, liftedRef) {
+      if (!foot || foot.visibility < 0.5) {
         return;
       }
 
-      // First detected position becomes
-      // our starting resting position
       if (restRef.current === null) {
         restRef.current = foot.y;
         return;
       }
-
-      /*
-        Only slowly update resting position
-        while the foot is NOT lifted.
-
-        This lets the tracker adjust if you
-        move slightly around the room.
-      */
 
       if (!liftedRef.current) {
         restRef.current =
@@ -305,31 +221,16 @@ function App() {
       }
     }
 
-    // ==========================================
-    // CHECK FOOT STOMPS
-    // ==========================================
+    // =====================================================
+    // FOOT STOMP GESTURES
+    // =====================================================
 
-    function checkFootStomps(
-      landmarks,
-      time
-    ) {
-      /*
-        MediaPipe:
+    function checkFootStomps(landmarks, time) {
+      // 27 = left ankle
+      // 28 = right ankle
 
-        27 = left ankle
-        28 = right ankle
-        31 = left foot index
-        32 = right foot index
-
-        We'll use the ankle because it tends
-        to be more stable than the toe.
-      */
-
-      const leftFoot =
-        landmarks[27];
-
-      const rightFoot =
-        landmarks[28];
+      const leftFoot = landmarks[27];
+      const rightFoot = landmarks[28];
 
       if (
         !leftFoot ||
@@ -361,160 +262,100 @@ function App() {
 
       const LEFT_LIFT_AMOUNT = 0.055;
       const RIGHT_LIFT_AMOUNT = 0.055;
-
       const RETURN_AMOUNT = 0.025;
 
-      // ======================================
-      // RIGHT FOOT LIFTED
-      // ======================================
-
+      // RIGHT FOOT LIFT
       if (
         rightFoot.y <
-        rightFootRestYRef.current -
-          RIGHT_LIFT_AMOUNT
+        rightFootRestYRef.current - RIGHT_LIFT_AMOUNT
       ) {
-        rightFootLiftedRef.current =
-          true;
+        rightFootLiftedRef.current = true;
       }
 
-      // ======================================
-      // RIGHT FOOT COMES BACK DOWN
-      // NEXT BOTTOM
-      // ======================================
-
+      // RIGHT FOOT RETURNS = NEXT BOTTOM
       if (
         rightFootLiftedRef.current &&
         rightFoot.y >
-          rightFootRestYRef.current -
-            RETURN_AMOUNT
+          rightFootRestYRef.current - RETURN_AMOUNT
       ) {
-        if (
-          time -
-            lastGestureTimeRef.current >
-          900
-        ) {
-          setBottomNumber(
-            (current) => current + 1
-          );
+        if (time - lastGestureTimeRef.current > 900) {
+          setBottomNumber((current) => current + 1);
 
           setGesture(
-            "RIGHT FOOT 🦶 — NEXT BOTTOM 👖"
+            "🦶 RIGHT FOOT STOMP — NEXT BOTTOM 👖"
           );
 
-          lastGestureTimeRef.current =
-            time;
+          lastGestureTimeRef.current = time;
         }
 
-        rightFootLiftedRef.current =
-          false;
-
-        rightFootRestYRef.current =
-          rightFoot.y;
+        rightFootLiftedRef.current = false;
+        rightFootRestYRef.current = rightFoot.y;
 
         return;
       }
 
-      // ======================================
-      // LEFT FOOT LIFTED
-      // ======================================
-
+      // LEFT FOOT LIFT
       if (
         leftFoot.y <
-        leftFootRestYRef.current -
-          LEFT_LIFT_AMOUNT
+        leftFootRestYRef.current - LEFT_LIFT_AMOUNT
       ) {
-        leftFootLiftedRef.current =
-          true;
+        leftFootLiftedRef.current = true;
       }
 
-      // ======================================
-      // LEFT FOOT COMES BACK DOWN
-      // PREVIOUS BOTTOM
-      // ======================================
-
+      // LEFT FOOT RETURNS = PREVIOUS BOTTOM
       if (
         leftFootLiftedRef.current &&
         leftFoot.y >
-          leftFootRestYRef.current -
-            RETURN_AMOUNT
+          leftFootRestYRef.current - RETURN_AMOUNT
       ) {
-        if (
-          time -
-            lastGestureTimeRef.current >
-          900
-        ) {
-          setBottomNumber(
-            (current) => {
-              if (current === 0) {
-                setGesture(
-                  "🚫 FIRST BOTTOM"
-                );
-
-                return 0;
-              }
-
-              setGesture(
-                "LEFT FOOT 🦶 — PREVIOUS BOTTOM 👖"
-              );
-
-              return current - 1;
+        if (time - lastGestureTimeRef.current > 900) {
+          setBottomNumber((current) => {
+            if (current === 0) {
+              setGesture("🚫 FIRST BOTTOM");
+              return 0;
             }
-          );
 
-          lastGestureTimeRef.current =
-            time;
+            setGesture(
+              "🦶 LEFT FOOT STOMP — PREVIOUS BOTTOM 👖"
+            );
+
+            return current - 1;
+          });
+
+          lastGestureTimeRef.current = time;
         }
 
-        leftFootLiftedRef.current =
-          false;
-
-        leftFootRestYRef.current =
-          leftFoot.y;
+        leftFootLiftedRef.current = false;
+        leftFootRestYRef.current = leftFoot.y;
 
         return;
       }
     }
 
-    // ==========================================
-    // BODY TRACKING LOOP
-    // ==========================================
+    // =====================================================
+    // POSE DETECTION LOOP
+    // =====================================================
 
     function detectPose() {
-      const video =
-        videoRef.current;
+      if (stopped) return;
 
-      const canvas =
-        canvasRef.current;
+      const video = videoRef.current;
+      const canvas = canvasRef.current;
+      const pose = poseLandmarkerRef.current;
 
-      const pose =
-        poseLandmarkerRef.current;
-
-      if (
-        !video ||
-        !canvas ||
-        !pose
-      ) {
+      if (!video || !canvas || !pose) {
         return;
       }
 
-      const ctx =
-        canvas.getContext("2d");
+      const ctx = canvas.getContext("2d");
 
       if (video.readyState >= 2) {
-        canvas.width =
-          video.videoWidth;
+        canvas.width = video.videoWidth;
+        canvas.height = video.videoHeight;
 
-        canvas.height =
-          video.videoHeight;
+        const time = performance.now();
 
-        const time =
-          performance.now();
-
-        const result =
-          pose.detectForVideo(
-            video,
-            time
-          );
+        const result = pose.detectForVideo(video, time);
 
         ctx.clearRect(
           0,
@@ -527,18 +368,11 @@ function App() {
           result.landmarks &&
           result.landmarks.length > 0
         ) {
-          const landmarks =
-            result.landmarks[0];
+          const landmarks = result.landmarks[0];
 
-          // ====================================
-          // HAND TRACKING
-          // ====================================
-
-          const leftWrist =
-            landmarks[15];
-
-          const rightWrist =
-            landmarks[16];
+          // HANDS
+          const leftWrist = landmarks[15];
+          const rightWrist = landmarks[16];
 
           saveHandPosition(
             leftHandHistoryRef,
@@ -552,125 +386,167 @@ function App() {
             time
           );
 
-          // ====================================
           // CHECK GESTURES
-          // ====================================
-
-          checkFootStomps(
-            landmarks,
-            time
-          );
-
+          checkFootStomps(landmarks, time);
           checkTopGestures(time);
 
-          // ====================================
           // DRAW TRACKING DOTS
-          // ====================================
-
           const pointsToDraw = [
-            11, // left shoulder
-            12, // right shoulder
-
-            13, // left elbow
-            14, // right elbow
-
-            15, // left wrist
-            16, // right wrist
-
-            23, // left hip
-            24, // right hip
-
-            25, // left knee
-            26, // right knee
-
-            27, // left ankle
-            28, // right ankle
+            11,
+            12,
+            13,
+            14,
+            15,
+            16,
+            23,
+            24,
+            25,
+            26,
+            27,
+            28,
           ];
 
-          ctx.fillStyle =
-            "#ff1493";
-
-          ctx.strokeStyle =
-            "white";
-
+          ctx.fillStyle = "#ff1493";
+          ctx.strokeStyle = "white";
           ctx.lineWidth = 4;
 
-          pointsToDraw.forEach(
-            (index) => {
-              const point =
-                landmarks[index];
+          pointsToDraw.forEach((index) => {
+            const point = landmarks[index];
 
-              if (!point) return;
+            if (!point) return;
 
-              const x =
-                point.x *
-                canvas.width;
+            const x = point.x * canvas.width;
+            const y = point.y * canvas.height;
 
-              const y =
-                point.y *
-                canvas.height;
+            ctx.beginPath();
 
-              ctx.beginPath();
+            ctx.arc(
+              x,
+              y,
+              9,
+              0,
+              Math.PI * 2
+            );
 
-              ctx.arc(
-                x,
-                y,
-                9,
-                0,
-                Math.PI * 2
-              );
-
-              ctx.fill();
-              ctx.stroke();
-            }
-          );
+            ctx.fill();
+            ctx.stroke();
+          });
         }
       }
 
       animationRef.current =
-        requestAnimationFrame(
-          detectPose
-        );
+        requestAnimationFrame(detectPose);
     }
 
     startCamera();
 
-    // ==========================================
     // CLEANUP
-    // ==========================================
-
     return () => {
-      cancelAnimationFrame(
-        animationRef.current
-      );
+      stopped = true;
+
+      if (animationRef.current) {
+        cancelAnimationFrame(
+          animationRef.current
+        );
+      }
 
       if (stream) {
         stream
           .getTracks()
-          .forEach((track) => {
-            track.stop();
-          });
+          .forEach((track) => track.stop());
       }
 
-      if (
-        poseLandmarkerRef.current
-      ) {
+      if (poseLandmarkerRef.current) {
         poseLandmarkerRef.current.close();
+        poseLandmarkerRef.current = null;
       }
     };
   }, []);
 
-  // ==========================================
+  // =====================================================
+  // UPLOAD + AUTOMATIC BACKGROUND REMOVAL
+  // =====================================================
+
+  async function handleImageUpload(event) {
+    const file = event.target.files?.[0];
+
+    if (!file) return;
+
+    if (!file.type.startsWith("image/")) {
+      setGesture("❌ PLEASE CHOOSE AN IMAGE");
+      return;
+    }
+
+    setIsRemovingBackground(true);
+    setGesture("✨ REMOVING BACKGROUND...");
+
+    try {
+      /*
+        IMG.LY processes the image in the browser
+        and returns a PNG Blob with transparency.
+      */
+      const transparentBlob =
+        await removeBackground(file, {
+          output: {
+            format: "image/png",
+            quality: 1,
+            type: "foreground",
+          },
+        });
+
+      const transparentURL =
+        URL.createObjectURL(transparentBlob);
+
+      setUploadedImage((oldImage) => {
+        if (oldImage) {
+          URL.revokeObjectURL(oldImage);
+        }
+
+        return transparentURL;
+      });
+
+      setGesture(
+        `✨ ${clothingType.toUpperCase()} READY — BACKGROUND REMOVED`
+      );
+    } catch (error) {
+      console.error(
+        "Background removal error:",
+        error
+      );
+
+      setGesture(
+        "❌ BACKGROUND REMOVAL FAILED — TRY ANOTHER IMAGE"
+      );
+    } finally {
+      setIsRemovingBackground(false);
+
+      // Allows same image to be selected again
+      event.target.value = "";
+    }
+  }
+
+  // =====================================================
+  // REMOVE UPLOADED IMAGE
+  // =====================================================
+
+  function removeUploadedImage() {
+    if (uploadedImage) {
+      URL.revokeObjectURL(uploadedImage);
+    }
+
+    setUploadedImage(null);
+    setGesture("Clothing removed");
+  }
+
+  // =====================================================
   // PAGE
-  // ==========================================
+  // =====================================================
 
   return (
     <div className="app">
 
-      <header>
-        <h1>
-          ♡ MOTION CLOSET ♡
-        </h1>
+      <header className="main-header">
+        <h1>♡ MOTION CLOSET ♡</h1>
 
         <p>
           Your body. Your closet. Your style.
@@ -692,6 +568,8 @@ function App() {
       <div className="bottom-display">
         👖 CURRENT BOTTOM: {bottomNumber}
       </div>
+
+      {/* CAMERA */}
 
       <div className="camera-frame">
 
@@ -718,6 +596,8 @@ function App() {
 
       </div>
 
+      {/* GESTURE CONTROLS */}
+
       <div className="controls">
 
         <div>
@@ -736,29 +616,133 @@ function App() {
           🦶 LEFT FOOT STOMP — PREVIOUS BOTTOM
         </div>
 
-            </div>
+      </div>
 
       {/* ADD TO CLOSET */}
-      <div className="closet-upload">
+
+      <section className="closet-upload">
+
         <h2>♡ ADD TO CLOSET ♡</h2>
 
-        <p>Add a clothing photo to your virtual closet</p>
+        <p className="upload-description">
+          Upload a clothing photo and we'll
+          automatically remove the background
+        </p>
 
         <div className="clothing-type-buttons">
-          <button>👚 TOP</button>
-          <button>👖 BOTTOM</button>
+
+          <button
+            type="button"
+            className={
+              clothingType === "top"
+                ? "type-button selected"
+                : "type-button"
+            }
+            onClick={() =>
+              setClothingType("top")
+            }
+            disabled={isRemovingBackground}
+          >
+            👚 TOP
+          </button>
+
+          <button
+            type="button"
+            className={
+              clothingType === "bottom"
+                ? "type-button selected"
+                : "type-button"
+            }
+            onClick={() =>
+              setClothingType("bottom")
+            }
+            disabled={isRemovingBackground}
+          >
+            👖 BOTTOM
+          </button>
+
+        </div>
+
+        <div className="selected-type">
+          Adding to:{" "}
+          <strong>
+            {clothingType === "top"
+              ? "TOPS 👚"
+              : "BOTTOMS 👖"}
+          </strong>
         </div>
 
         <label className="upload-button">
-          📸 UPLOAD CLOTHING
+
+          {isRemovingBackground
+            ? "✨ REMOVING BACKGROUND..."
+            : "📸 UPLOAD CLOTHING"}
 
           <input
             type="file"
-            accept="image/*"
-            hidden
+            accept="image/png,image/jpeg,image/jpg,image/webp"
+            onChange={handleImageUpload}
+            className="file-input"
+            disabled={isRemovingBackground}
           />
+
         </label>
-      </div>
+
+        {isRemovingBackground && (
+          <div
+            style={{
+              marginTop: "20px",
+              fontWeight: "bold",
+              color: "#d6006e",
+            }}
+          >
+            ✨ AI is cutting out your clothing...
+            <br />
+            <small>
+              The first image may take a little longer.
+            </small>
+          </div>
+        )}
+
+        {/* TRANSPARENT IMAGE PREVIEW */}
+
+        {uploadedImage &&
+          !isRemovingBackground && (
+
+          <div className="upload-preview">
+
+            <div className="preview-title">
+              ✨ BACKGROUND REMOVED ✨
+            </div>
+
+            <div className="preview-image-container">
+
+              <img
+                src={uploadedImage}
+                alt={`Uploaded ${clothingType}`}
+                className="preview-image"
+              />
+
+            </div>
+
+            <div className="preview-type">
+              {clothingType === "top"
+                ? "👚 TOP"
+                : "👖 BOTTOM"}
+            </div>
+
+            <button
+              type="button"
+              className="remove-image-button"
+              onClick={removeUploadedImage}
+            >
+              REMOVE IMAGE
+            </button>
+
+          </div>
+        )}
+
+      </section>
 
     </div>
   );

@@ -12,297 +12,381 @@ body,
 
 body {
   font-family: Arial, Helvetica, sans-serif;
-
-  background:
-    linear-gradient(
-      135deg,
-      #ffb6dc,
-      #ff4fa3
-    );
+  background: linear-gradient(135deg, #ffb6dc, #ff4fa3);
 }
 
 .app {
   min-height: 100vh;
   width: 100%;
-
   text-align: center;
-
   padding: 30px;
-
   color: white;
 }
 
+/* ============================= */
 /* HEADER */
+/* ============================= */
 
-header h1 {
+.main-header h1 {
   font-size: 48px;
-
   margin: 10px 0 5px;
-
   color: white;
-
-  text-shadow:
-    3px 3px 0 #d6006e;
+  text-shadow: 3px 3px 0 #d6006e;
 }
 
-header p {
+.main-header p {
   font-size: 18px;
-
   margin-bottom: 20px;
 }
 
+/* ============================= */
 /* STATUS */
+/* ============================= */
 
 .status {
   display: inline-block;
-
   margin-bottom: 10px;
-
   padding: 8px 16px;
-
-  background:
-    rgba(
-      255,
-      255,
-      255,
-      0.9
-    );
-
+  background: rgba(255, 255, 255, 0.9);
   color: #d6006e;
-
   border-radius: 20px;
-
   font-weight: bold;
 }
-
-/* GESTURE */
 
 .gesture-display {
-  width:
-    min(
-      700px,
-      90vw
-    );
-
-  margin:
-    5px auto;
-
+  width: min(700px, 90vw);
+  margin: 5px auto;
   padding: 10px 16px;
-
   background: white;
-
   color: #d6006e;
-
   border-radius: 20px;
-
   font-size: 18px;
-
   font-weight: bold;
 }
-
-/* CURRENT TOP */
 
 .top-display {
-  width:
-    min(
-      700px,
-      90vw
-    );
-
-  margin:
-    8px auto 15px;
-
+  width: min(700px, 90vw);
+  margin: 8px auto;
   padding: 10px 16px;
-
   background: #ff1493;
-
   color: white;
-
   border-radius: 20px;
-
   font-weight: bold;
 }
 
-/* CAMERA FRAME */
+.bottom-display {
+  width: min(700px, 90vw);
+  margin: 8px auto 15px;
+  padding: 10px 16px;
+  background: #ff69b4;
+  color: white;
+  border-radius: 20px;
+  font-weight: bold;
+}
+
+/* ============================= */
+/* CAMERA */
+/* ============================= */
 
 .camera-frame {
   position: relative;
-
-  width:
-    min(
-      700px,
-      90vw
-    );
-
+  width: min(700px, 90vw);
   margin: 0 auto;
-
   padding: 10px;
-
   background: white;
-
-  border:
-    5px solid #ff1493;
-
+  border: 5px solid #ff1493;
   border-radius: 30px;
-
-  box-shadow:
-    0 10px 40px
-      rgba(
-        150,
-        0,
-        80,
-        0.35
-      );
-
+  box-shadow: 0 10px 40px rgba(150, 0, 80, 0.35);
   overflow: hidden;
 }
 
 .camera-container {
   position: relative;
-
   width: 100%;
+  overflow: hidden;
+  border-radius: 18px;
 }
 
-/* CAMERA */
+/*
+  IMPORTANT:
+  This creates SELFIE/MIRROR MODE.
 
+  Your physical LEFT hand will appear
+  on the LEFT side of the screen.
+*/
 .camera {
   display: block;
-
   width: 100%;
-
   min-height: 400px;
-
   object-fit: cover;
-
   border-radius: 18px;
 
-  /*
-    Mirror the webcam
-  */
-  transform:
-    scaleX(-1);
+  transform: scaleX(-1) !important;
+  -webkit-transform: scaleX(-1) !important;
 }
 
-/* BODY TRACKING CANVAS */
-
+/*
+  Flip the MediaPipe dots too so they
+  remain lined up with your body.
+*/
 .pose-canvas {
   position: absolute;
-
   inset: 0;
-
   width: 100%;
   height: 100%;
-
-  /*
-    Mirror tracking dots
-    with camera
-  */
-  transform:
-    scaleX(-1);
-
   pointer-events: none;
-}
 
-/* CAMERA LABEL */
+  transform: scaleX(-1) !important;
+  -webkit-transform: scaleX(-1) !important;
+}
 
 .camera-label {
   position: absolute;
-
   top: 25px;
-
   left: 50%;
-
-  transform:
-    translateX(-50%);
-
+  transform: translateX(-50%);
   background: #ff1493;
-
   color: white;
-
   padding: 9px 20px;
-
   border-radius: 30px;
-
   font-weight: bold;
-
   letter-spacing: 1px;
+  z-index: 5;
 }
 
-/* CONTROLS */
+/* ============================= */
+/* GESTURE CONTROLS */
+/* ============================= */
 
 .controls {
-  width:
-    min(
-      700px,
-      90vw
-    );
-
-  margin:
-    25px auto;
-
+  width: min(700px, 90vw);
+  margin: 25px auto;
   display: grid;
-
-  grid-template-columns:
-    repeat(
-      2,
-      1fr
-    );
-
+  grid-template-columns: repeat(2, 1fr);
   gap: 12px;
 }
 
 .controls div {
-  background:
-    rgba(
-      255,
-      255,
-      255,
-      0.92
-    );
-
+  background: rgba(255, 255, 255, 0.92);
   color: #d6006e;
-
   padding: 16px;
-
-  border:
-    2px solid white;
-
+  border: 2px solid white;
   border-radius: 18px;
-
   font-weight: bold;
-
-  box-shadow:
-    0 5px 15px
-      rgba(
-        160,
-        0,
-        80,
-        0.15
-      );
+  box-shadow: 0 5px 15px rgba(160, 0, 80, 0.15);
 }
 
-/* MOBILE */
+/* ============================= */
+/* ADD TO CLOSET */
+/* ============================= */
 
-@media (
-  max-width: 600px
-) {
-  header h1 {
+.closet-upload {
+  width: min(700px, 90vw);
+  margin: 35px auto;
+  padding: 30px;
+  background: rgba(255, 255, 255, 0.96);
+  border: 4px solid #ff1493;
+  border-radius: 30px;
+  color: #d6006e;
+  box-shadow: 0 10px 30px rgba(150, 0, 80, 0.2);
+}
+
+.closet-upload h2 {
+  margin: 0 0 8px;
+  font-size: 30px;
+  color: #d6006e;
+}
+
+.upload-description {
+  margin: 0 0 22px;
+  color: #8d1652;
+  font-size: 17px;
+}
+
+/* ============================= */
+/* TOP / BOTTOM BUTTONS */
+/* ============================= */
+
+.clothing-type-buttons {
+  display: flex;
+  justify-content: center;
+  gap: 14px;
+  margin: 20px 0 15px;
+}
+
+.type-button {
+  min-width: 130px;
+  padding: 12px 24px;
+  border: 2px solid #ff1493;
+  border-radius: 22px;
+  background: white;
+  color: #d6006e;
+  font-size: 16px;
+  font-weight: bold;
+  cursor: pointer;
+
+  transition:
+    transform 0.15s ease,
+    background 0.15s ease,
+    color 0.15s ease;
+}
+
+.type-button:hover {
+  transform: translateY(-2px);
+  background: #ffe3f2;
+}
+
+.type-button.selected {
+  background: #ff1493;
+  color: white;
+  box-shadow: 0 5px 15px rgba(255, 20, 147, 0.25);
+}
+
+.selected-type {
+  margin: 15px 0;
+  font-size: 15px;
+  color: #a00054;
+}
+
+/* ============================= */
+/* UPLOAD BUTTON */
+/* ============================= */
+
+.upload-button {
+  display: inline-block;
+  margin-top: 5px;
+  padding: 14px 30px;
+  background: #ff1493;
+  color: white;
+  border: 3px solid #ff1493;
+  border-radius: 25px;
+  font-size: 17px;
+  font-weight: bold;
+  cursor: pointer;
+
+  box-shadow: 0 6px 18px rgba(255, 20, 147, 0.25);
+
+  transition:
+    transform 0.15s ease,
+    box-shadow 0.15s ease;
+}
+
+.upload-button:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 9px 22px rgba(255, 20, 147, 0.32);
+}
+
+.file-input {
+  display: none;
+}
+
+/* ============================= */
+/* IMAGE PREVIEW */
+/* ============================= */
+
+.upload-preview {
+  width: min(420px, 100%);
+  margin: 28px auto 0;
+  padding: 20px;
+  background: #fff5fa;
+  border: 3px solid #ff69b4;
+  border-radius: 25px;
+  box-shadow: 0 8px 25px rgba(255, 20, 147, 0.15);
+}
+
+.preview-title {
+  margin-bottom: 15px;
+  color: #d6006e;
+  font-size: 19px;
+  font-weight: bold;
+}
+
+.preview-image-container {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+
+  width: 100%;
+  min-height: 200px;
+  padding: 15px;
+
+  background: white;
+  border-radius: 18px;
+  overflow: hidden;
+}
+
+.preview-image {
+  display: block;
+  width: 100%;
+  max-width: 330px;
+  max-height: 350px;
+  object-fit: contain;
+  border-radius: 12px;
+}
+
+.preview-type {
+  margin-top: 15px;
+  color: #d6006e;
+  font-weight: bold;
+}
+
+/* ============================= */
+/* REMOVE IMAGE */
+/* ============================= */
+
+.remove-image-button {
+  margin-top: 14px;
+  padding: 10px 20px;
+
+  border: 2px solid #ff1493;
+  border-radius: 20px;
+
+  background: white;
+  color: #d6006e;
+
+  font-weight: bold;
+  cursor: pointer;
+
+  transition:
+    background 0.15s ease,
+    color 0.15s ease;
+}
+
+.remove-image-button:hover {
+  background: #ff1493;
+  color: white;
+}
+
+/* ============================= */
+/* MOBILE */
+/* ============================= */
+
+@media (max-width: 600px) {
+  .app {
+    padding: 18px 10px;
+  }
+
+  .main-header h1 {
     font-size: 34px;
   }
 
   .controls {
-    grid-template-columns:
-      1fr;
+    grid-template-columns: 1fr;
   }
-}
-.bottom-display {
-  width: min(700px, 90vw);
-  margin: 8px auto 15px;
-  padding: 10px 16px;
 
-  background: #ff69b4;
-  color: white;
+  .clothing-type-buttons {
+    flex-direction: column;
+  }
 
-  border-radius: 20px;
-  font-weight: bold;
+  .type-button {
+    width: 100%;
+  }
+
+  .camera {
+    min-height: 300px;
+  }
+
+  .closet-upload {
+    padding: 22px 15px;
+  }
 }
